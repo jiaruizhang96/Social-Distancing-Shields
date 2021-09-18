@@ -33,6 +33,6 @@ def yolov3(data,net,layers):
 			lefty = y+h
 			rightx = x+w
 			righty = lefty
-			results.append([leftx, lefty, rightx, righty])
+			results.append([[leftx, lefty, rightx, righty],[leftx, y, rightx, lefty]])
 	return results
 
