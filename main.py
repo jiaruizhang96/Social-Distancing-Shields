@@ -20,13 +20,14 @@ def main(test_video):
 		result = yolov3(data,net,layers)
 		# show the detected people 
 		for _,axis in enumerate(result):
-			(leftx, lefty, rightx, righty) = axis
+			[leftx, lefty, rightx, righty],[startX, startY, endX, endY] = axis
 			color = (0, 255, 0)
 			cv2.line(data,(leftx,lefty),(rightx,righty),color,5)
+			cv2.rectangle(data, (startX, startY), (endX, endY), color, 2)
 		#show result
 		cv2.imshow("Detection Results", data)
 		key = cv2.waitKey(1) & 0xFF
 
-test_video = "/Users/jiaruizhang/desktop/hackthenorth/video/test2.mp4"
+test_video = "/Users/jiaruizhang/desktop/hackthenorth/video/test.mp4"
 main(test_video)
 # %%
