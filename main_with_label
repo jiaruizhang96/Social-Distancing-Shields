@@ -1,0 +1,170 @@
+import cv2,os
+from os import path
+import detection,model
+from detection import yolov3 
+from model import load_model
+import numpy as np
+
+
+def rectangle_detection_by_manual_labelling(input_img):
+	global initialPoint, img,preview,line_pxl_coord_arr,each_line_pxl_arr      
+
+	# intialize values in unusable states
+	img = input_img
+	preview = None
+	initialPoint = (-1, -1)
+	line_pxl_coord_arr = []
+	each_line_pxl_arr = []  
+
+	# set the named window and callback          
+	cv2.namedWindow("image")
+	cv2.setMouseCallback("image", drawLine)
+
+	while (True):
+		# if we are drawing show preview, otherwise the image
+		if preview is None:
+			cv2.imshow('image',img)
+		else :
+			cv2.imshow('image',preview)
+		k = cv2.waitKey(1) & 0xFF
+		if k == ord('q'):
+			break;
+
+	cv2.destroyAllWindows()
+	print("line_pxl_coord_arr",len(line_pxl_coord_arr),len(line_pxl_coord_arr[0]),line_pxl_coord_arr)
+	tape_info_arr = []
+	for line_coord in line_pxl_coord_arr:
+		print("line_coord",line_coord)
+		mid_x = (1/2)*(min(line_coord)[0]+max(line_coord)[0])
+		mid_y = (1/2)*(min(line_coord)[1]+max(line_coord)[1])
+		# print(min(line_coord[0]),max(line_coord[0]))
+		# print(min(line_coord[1]),max(line_coord[1]))
+		circle_radius = max(line_coord)[0] - mid_x
+		
+		################ can be changed ########################
+		safety_distance_half = int(2/3*circle_radius)
+		################ can be changed ########################
+		
+		img = cv2.circle(img, (int(mid_x),int(mid_y)), int(circle_radius), (255,0,0), 3)
+		img = cv2.rectangle(img,(min(line_coord)[0],min(line_coord)[1]-safety_distance_half),(max(line_coord)[0],max(line_coord)[1]+safety_distance_half),(0,0,255), 3)
+		# Displaying the image
+		cv2.imshow("img", img)
+		cv2.waitKey(0)
+		tape_info_arr.append(([min(line_coord)[0],min(line_coord)[1]-safety_distance_half,max(line_coord)[0],max(line_coord)[1]+safety_distance_half],circle_radius))
+	return tape_info_arr
+
+# mouse callback
+def drawLine(event,x,y,flags,param):
+	global initialPoint,img, preview,line_pxl_coord_arr,each_line_pxl_arr      
+
+	if event == cv2.EVENT_LBUTTONDOWN:
+		# new initial point and preview is now a copy of the original image
+		initialPoint = (x,y)
+		preview = img.copy()
+		# this will be a point at this point in time
+		cv2.line(preview, initialPoint, (x,y), (0,255,0), 3)
+		# print("(x,y)",(x,y),each_line_pxl_arr)
+		each_line_pxl_arr = [] 
+		each_line_pxl_arr.append((x,y))
+
+	elif event == cv2.EVENT_MOUSEMOVE:
+		if preview is not None:
+			# copy the original image again a redraw the new line
+			preview = img.copy()
+			cv2.line(preview, initialPoint, (x,y), (0,255,0), 3)
+			# print("(x,y)2",(x,y),each_line_pxl_arr)
+			each_line_pxl_arr.append((x,y))
+
+	elif event == cv2.EVENT_LBUTTONUP:
+	# if we are drawing, preview is not None and since we finish, draw the final line in the image
+		if preview is not None:
+				preview = None
+				cv2.line(img, initialPoint, (x,y), (255,0,0), 3)
+				# print("(x,y)3",(x,y),each_line_pxl_arr,line_pxl_coord_arr)
+				each_line_pxl_arr.append((x,y))
+				line_pxl_coord_arr.append(each_line_pxl_arr)
+
+def main(test_video):
+	# check if the test video exists
+	if not path.exists(test_video):
+		return False
+	# load video
+	video = cv2.VideoCapture(test_video)
+	frame_width = int(video.get(3))
+	frame_height = int(video.get(4))
+
+
+	size = (frame_width, frame_height)
+
+	# Below VideoWriter object will create
+	# a frame of above defined The output 
+	# is stored in 'filename.avi' file.
+	result_video = cv2.VideoWriter('filename.avi', cv2.VideoWriter_fourcc(*'MJPG'),10, size)
+
+	# load model 
+	net,layers = load_model()
+	iteration = 0
+	while True:
+		# read data
+		_,data = video.read()
+		if(iteration == 0):
+			tape_info_arr = rectangle_detection_by_manual_labelling(data)
+		iteration+=1
+		# get detection result
+		result = yolov3(data,net,layers)
+		# show the detected people 
+		for _,axis in enumerate(result):
+			color = (0, 255, 0) #green
+			[leftx, lefty, rightx, righty],[startX, startY, endX, endY] = axis
+			person_coordinate = (int(0.5*(leftx+rightx)),int(0.5*(righty+lefty)))
+			tape_dict = {}
+			tape_id = 0
+			for line in tape_info_arr:
+    			# for circle
+				# tape_center_coordinate = line[0]
+				# safety_distance = line[1]
+				# euclidean_distance = np.sqrt((person_coordinate[0]-tape_center_coordinate[0])**2+(person_coordinate[1]-tape_center_coordinate[1])**2)
+				# if safety_distance > euclidean_distance:
+				# 	color = (0,0,255) #red
+
+				# for rectangle
+				safety_rectangular_range_coord = line[0]
+				# minx, miny+safety, maxx, maxy+safety
+				print(person_coordinate[0],safety_rectangular_range_coord[0])
+				
+				if (person_coordinate[0] >= safety_rectangular_range_coord[0]) and (person_coordinate[0] <= safety_rectangular_range_coord[2]) and (person_coordinate[1] >= safety_rectangular_range_coord[1]) and (person_coordinate[1] <= safety_rectangular_range_coord[3]):
+					# a person is standing inside the rectangular box
+					if tape_id not in tape_dict:
+						tape_dict[tape_id] = [1,[startX, startY, endX, endY]]
+					else: 
+						prev_dict_value = tape_dict[tape_id]
+						prev_dict_value_arr = []
+						for arr in prev_dict_value[1]:
+							prev_dict_value_arr.append(arr)
+						prev_dict_value_arr.append([startX, startY, endX, endY])
+						tape_dict[tape_id] = [prev_dict_value[0]+1,prev_dict_value_arr]
+				else:
+					cv2.rectangle(data, (startX, startY), (endX, endY), (0,255,0), 2)
+			print("tape_dict",tape_dict)
+			for key in tape_dict:
+				color = (0,255,0) # green
+				value = tape_dict[key]
+				print(value)
+				if value[0] > 1:
+					color = (0,0,255) # red
+					for arr in value[1]:
+						# cv2.line(data,(leftx,lefty),(rightx,righty),color,5)
+						cv2.rectangle(data, (arr[0],arr[1]), (arr[2], arr[3]), color, 2)
+				else:
+					cv2.rectangle(data, (value[1][0],value[1][1]), (value[1][2], value[1][3]), color, 2)
+					
+		#show result
+		result_video.write(data)
+		# cv2.imshow("Detection Results", data)
+		# key = cv2.waitKey(1) & 0xFF
+		# key = cv2.waitKey(0.5) & 0xFF
+	result_video.release()
+	video.release()
+
+test_video = r"C:\Users\kathy\Documents\SD-shields-hackthenorth\Social-Distancing-Shields\parkway_1.mp4"
+main(test_video)
