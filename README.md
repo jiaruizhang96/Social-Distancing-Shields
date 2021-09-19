@@ -1,3 +1,3 @@
 # Social-Distancing-Shields
 
-call main() function in main.py with path to the test video
+call main() function in main_with_label.py with path to the test video
