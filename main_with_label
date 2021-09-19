@@ -45,8 +45,8 @@ def rectangle_detection_by_manual_labelling(input_img):
 		safety_distance_half = int(2/3*circle_radius)
 		################ can be changed ########################
 		
-		img = cv2.circle(img, (int(mid_x),int(mid_y)), int(circle_radius), (255,0,0), 3)
-		img = cv2.rectangle(img,(min(line_coord)[0],min(line_coord)[1]-safety_distance_half),(max(line_coord)[0],max(line_coord)[1]+safety_distance_half),(0,0,255), 3)
+		# img = cv2.circle(img, (int(mid_x),int(mid_y)), int(circle_radius), (255,0,0), 3)
+		img = cv2.rectangle(img,(min(line_coord)[0],min(line_coord)[1]-safety_distance_half),(max(line_coord)[0],max(line_coord)[1]+safety_distance_half),(100,100,100), 3)
 		# Displaying the image
 		cv2.imshow("img", img)
 		cv2.waitKey(0)
@@ -147,7 +147,7 @@ def main(test_video):
 							prev_dict_value_arr.append([startX, startY, endX, endY])
 						tape_dict[tape_id] = [prev_dict_value[0]+1,prev_dict_value_arr]
 				else:
-					cv2.rectangle(data, (startX, startY), (endX, endY), (0,255,0), 2)
+					cv2.rectangle(data, (startX, startY), (endX, endY), (0,0,255), 2)
 				tape_id += 1
 				cv2.rectangle(data,(safety_rectangular_range_coord[0],safety_rectangular_range_coord[1]),(safety_rectangular_range_coord[2],safety_rectangular_range_coord[3]),(100,100,100), 2)
 		
